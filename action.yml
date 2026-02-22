@@ -1,0 +1,52 @@
+name: 'AIReady Check'
+description: 'Run AI readiness analysis and block PRs that break your AI context budget'
+author: 'AIReady'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  directory:
+    description: 'Directory to analyze'
+    required: false
+    default: '.'
+  threshold:
+    description: 'Minimum AI readiness score (0-100) required to pass'
+    required: false
+    default: '70'
+  fail-on:
+    description: 'Fail on issues of this severity or higher (critical, major, any, none)'
+    required: false
+    default: 'critical'
+  tools:
+    description: 'Tools to run (comma-separated: patterns,context,consistency)'
+    required: false
+    default: 'patterns,context,consistency'
+  upload-to-saas:
+    description: 'Upload results to AIReady SaaS for historical tracking'
+    required: false
+    default: 'false'
+  api-key:
+    description: 'AIReady API key (required if upload-to-saas is true)'
+    required: false
+  repo-id:
+    description: 'Repository ID in AIReady SaaS (required if upload-to-saas is true)'
+    required: false
+
+outputs:
+  score:
+    description: 'Overall AI readiness score'
+  passed:
+    description: 'Whether the check passed (true/false)'
+  issues:
+    description: 'Number of issues found'
+  critical:
+    description: 'Number of critical issues'
+  major:
+    description: 'Number of major issues'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.js'
+</task_progress>
+</write_to_file>
