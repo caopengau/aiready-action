@@ -1,0 +1,57 @@
+name: 'AIReady Check'
+description: 'Analyze your codebase for AI readability - Block PRs that break your AI context budget'
+author: 'AIReady'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  token:
+    description: 'GitHub token for API access'
+    required: false
+    default: ${{ github.token }}
+  paths:
+    description: 'Paths to analyze (comma-separated)'
+    required: false
+    default: '.'
+  exclude:
+    description: 'Patterns to exclude (comma-separated)'
+    required: false
+    default: ''
+  fail-on-issues:
+    description: 'Fail the workflow if issues are found'
+    required: false
+    default: 'false'
+  max-issues:
+    description: 'Maximum number of issues allowed before failing'
+    required: false
+    default: '10'
+  min-score:
+    description: 'Minimum AI readiness score required (0-100)'
+    required: false
+    default: '70'
+  output-format:
+    description: 'Output format (summary, json, or both)'
+    required: false
+    default: 'summary'
+
+outputs:
+  passed:
+    description: 'Whether the AI readiness check passed'
+    value: ${{ steps.aiready.outputs.passed }}
+  score:
+    description: 'AI readiness score (0-100)'
+    value: ${{ steps.aiready.outputs.score }}
+  issues:
+    description: 'Number of issues found'
+    value: ${{ steps.aiready.outputs.issues }}
+  warnings:
+    description: 'Number of warnings found'
+    value: ${{ steps.aiready.outputs.warnings }}
+  report:
+    description: 'Detailed report in JSON format'
+    value: ${{ steps.aiready.outputs.report }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
