@@ -9,6 +9,7 @@
 ## Why AIReady?
 
 AI coding assistants (GitHub Copilot, Cursor, Claude, ChatGPT) struggle with:
+
 - 🔄 **Semantic duplicates** - Same logic written differently, confusing AI
 - 🔗 **Deep import chains** - Exceeding context windows
 - 📛 **Inconsistent naming** - Making code harder for AI to understand
@@ -35,22 +36,22 @@ jobs:
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `directory` | No | `.` | Directory to analyze |
-| `threshold` | No | `70` | Minimum AI readiness score (0-100) |
-| `fail-on` | No | `critical` | Fail on severity: `critical`, `major`, `any`, `none` |
-| `tools` | No | `patterns,context,consistency` | Tools to run |
+| Input       | Required | Default                        | Description                                          |
+| ----------- | -------- | ------------------------------ | ---------------------------------------------------- |
+| `directory` | No       | `.`                            | Directory to analyze                                 |
+| `threshold` | No       | `70`                           | Minimum AI readiness score (0-100)                   |
+| `fail-on`   | No       | `critical`                     | Fail on severity: `critical`, `major`, `any`, `none` |
+| `tools`     | No       | `patterns,context,consistency` | Tools to run                                         |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `score` | Overall AI readiness score (0-100) |
-| `passed` | Whether the check passed (`true`/`false`) |
-| `issues` | Total number of issues found |
-| `critical` | Number of critical issues |
-| `major` | Number of major issues |
+| Output     | Description                               |
+| ---------- | ----------------------------------------- |
+| `score`    | Overall AI readiness score (0-100)        |
+| `passed`   | Whether the check passed (`true`/`false`) |
+| `issues`   | Total number of issues found              |
+| `critical` | Number of critical issues                 |
+| `major`    | Number of major issues                    |
 
 ## Examples
 
@@ -82,7 +83,7 @@ jobs:
 ```yaml
 - uses: caopengau/aiready-action@v1
   with:
-    tools: 'patterns,context'  # Skip consistency check
+    tools: 'patterns,context' # Skip consistency check
 ```
 
 ### Upload to SaaS for History
@@ -98,11 +99,11 @@ jobs:
 
 ## Pricing
 
-| Plan | Price | Features |
-|------|-------|----------|
-| **Open Source** | Free | Unlimited public repos |
-| **Pro** | $9/mo | Private repos, history, trends |
-| **Team** | $29/mo | Team dashboard, integrations |
+| Plan            | Price  | Features                       |
+| --------------- | ------ | ------------------------------ |
+| **Open Source** | Free   | Unlimited public repos         |
+| **Pro**         | $9/mo  | Private repos, history, trends |
+| **Team**        | $29/mo | Team dashboard, integrations   |
 
 ## Other Installation Methods
 
