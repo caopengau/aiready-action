@@ -10,6 +10,12 @@ inputs:
     description: 'Directory to analyze'
     required: false
     default: '.'
+  include:
+    description: 'Comma-separated glob patterns to include (e.g., "**/*.{ts,py,java}")'
+    required: false
+  exclude:
+    description: 'Comma-separated glob patterns to exclude'
+    required: false
   threshold:
     description: 'Minimum AI readiness score (0-100) required to pass'
     required: false
@@ -19,9 +25,9 @@ inputs:
     required: false
     default: 'critical'
   tools:
-    description: 'Tools to run (comma-separated: patterns,context,consistency)'
+    description: 'Tools to run (comma-separated). Defaults to all 9 analysis tools.'
     required: false
-    default: 'patterns,context,consistency'
+    default: 'patterns,context,consistency,ai-signal,grounding,testability,doc-drift,deps,change-amp'
   upload-to-saas:
     description: 'Upload results to AIReady SaaS for historical tracking'
     required: false
@@ -48,5 +54,3 @@ outputs:
 runs:
   using: 'node24'
   main: 'dist/index.js'
-</task_progress>
-</write_to_file>

@@ -15,24 +15,32 @@ const execAsync = promisify(exec);
 interface AnalysisResult {
   summary: {
     totalIssues: number;
+    criticalIssues?: number;
+    majorIssues?: number;
     toolsRun: string[];
     executionTime: number;
   };
-  patterns?: Array<{ issues: Array<{ severity: string }> }>;
-  context?: Array<{ severity: string }>;
-  consistency?: { summary: { totalIssues: number }; results?: Array<{ issues: Array<{ severity: string }> }> };
   scoring?: {
-    overallScore: number;
-    breakdown: Array<{ toolName: string; score: number }>;
+    overall: number;
+    rating: string;
+    breakdown: Array<{ toolName: string; score: number; rating: string }>;
+    costEstimate?: {
+      total: string;
+      model: string;
+    };
   };
 }
 
 async function run(): Promise<void> {
   try {
     const directory = core.getInput('directory') || '.';
+    const include = core.getInput('include');
+    const exclude = core.getInput('exclude');
     const threshold = parseInt(core.getInput('threshold') || '70', 10);
     const failOn = core.getInput('fail-on') || 'critical';
-    const tools = core.getInput('tools') || 'patterns,context,consistency';
+    const tools = core.getInput('tools') || 'patterns,context,consistency,ai-signal,grounding,testability,doc-drift,deps,change-amp';
+    const uploadToSaas = core.getInput('upload-to-saas') === 'true';
+    const apiKey = core.getInput('api-key');
 
     core.info('🚀 AIReady Check starting...');
     core.info(`   Directory: ${directory}`);
@@ -45,13 +53,18 @@ async function run(): Promise<void> {
     }
     const outputFile = join(tmpDir, 'aiready-results.json');
 
-    const cliCommand = `npx @aiready/cli scan "${directory}" --tools ${tools} --output json --output-file "${outputFile}" --score`;
+    let cliCommand = `npx @aiready/cli scan "${directory}" --tools ${tools} --output json --output-file "${outputFile}" --score --ci`;
+    
+    if (include) cliCommand += ` --include "${include}"`;
+    if (exclude) cliCommand += ` --exclude "${exclude}"`;
+    
     core.info(`\n📦 Running: ${cliCommand}\n`);
 
     try {
       const { stdout } = await execAsync(cliCommand, { maxBuffer: 50 * 1024 * 1024 });
       core.info(stdout);
     } catch (error: any) {
+      // In CI mode, the CLI might exit with 1 if issues are found, but we want to parse the JSON
       if (error.stdout) core.info(error.stdout);
       if (error.stderr) core.warning(error.stderr);
     }
@@ -63,27 +76,11 @@ async function run(): Promise<void> {
 
     const results: AnalysisResult = JSON.parse(readFileSync(outputFile, 'utf8'));
 
-    // Count issues by severity
-    let criticalCount = 0;
-    let majorCount = 0;
-
-    results.patterns?.forEach(p => p.issues.forEach(i => {
-      if (i.severity === 'critical') criticalCount++;
-      else if (i.severity === 'major') majorCount++;
-    }));
-
-    results.context?.forEach(c => {
-      if (c.severity === 'critical') criticalCount++;
-      else if (c.severity === 'major') majorCount++;
-    });
-
-    results.consistency?.results?.forEach(r => r.issues?.forEach(i => {
-      if (i.severity === 'critical') criticalCount++;
-      else if (i.severity === 'major') majorCount++;
-    }));
-
-    const score = results.scoring?.overallScore || 0;
-    const totalIssues = results.summary.totalIssues;
+    const score = results.scoring?.overall || 0;
+    const rating = results.scoring?.rating || 'Unknown';
+    const totalIssues = results.summary.totalIssues || 0;
+    const criticalCount = results.summary.criticalIssues || 0;
+    const majorCount = results.summary.majorIssues || 0;
 
     core.setOutput('score', score);
     core.setOutput('issues', totalIssues);
@@ -99,27 +96,59 @@ async function run(): Promise<void> {
       failReason = `AI Readiness Score ${score} is below threshold ${threshold}`;
     }
 
-    if (failOn === 'critical' && criticalCount > 0) {
+    if (failOnLevel(failOn, criticalCount, majorCount, totalIssues)) {
       passed = false;
-      failReason = `Found ${criticalCount} critical issues`;
-    } else if (failOn === 'major' && (criticalCount + majorCount) > 0) {
-      passed = false;
-      failReason = `Found ${criticalCount} critical and ${majorCount} major issues`;
-    } else if (failOn === 'any' && totalIssues > 0) {
-      passed = false;
-      failReason = `Found ${totalIssues} total issues`;
+      failReason = `Found issues exceeding ${failOn} threshold (critical: ${criticalCount}, major: ${majorCount})`;
     }
 
     core.setOutput('passed', passed);
 
     // Summary
-    core.summary
+    const summary = core.summary
       .addHeading('AI Readiness Check', 2)
-      .addRaw(`**Score:** ${score}/100\n`)
+      .addRaw(`**Score:** ${score}/100 (${rating})\n`)
       .addRaw(`**Threshold:** ${threshold}\n`)
-      .addRaw(`**Issues:** ${totalIssues} (${criticalCount} critical, ${majorCount} major)\n`)
-      .addRaw(`**Result:** ${passed ? '✅ PASSED' : '❌ FAILED'}\n`)
-      .write();
+      .addRaw(`**Issues:** ${totalIssues} (🔴 ${criticalCount} critical, 🟠 ${majorCount} major)\n`)
+      .addRaw(`**Result:** ${passed ? '✅ PASSED' : '❌ FAILED'}\n`);
+
+    if (results.scoring?.costEstimate) {
+      summary.addRaw(`**Estimated AI Waste:** $${results.scoring.costEstimate.total}/month (model: ${results.scoring.costEstimate.model})\n`);
+    }
+
+    if (results.scoring?.breakdown) {
+      summary.addHeading('Tool Breakdown', 3);
+      const rows = [['Tool', 'Score', 'Rating']];
+      results.scoring.breakdown.forEach(t => {
+        rows.push([t.toolName, t.score.toString(), t.rating]);
+      });
+      summary.addTable(rows as any);
+    }
+
+    await summary.write();
+
+    // SaaS Upload
+    if (uploadToSaas && apiKey) {
+      core.info('\n☁️ Uploading results to AIReady SaaS...');
+      try {
+        const response = await fetch('https://api.getaiready.dev/v1/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(results),
+        });
+        
+        if (response.ok) {
+          core.info('✅ Successfully uploaded to AIReady SaaS');
+        } else {
+          const errText = await response.text();
+          core.warning(`SaaS upload failed: ${response.status} ${errText}`);
+        }
+      } catch (err: any) {
+        core.warning(`SaaS upload error: ${err.message}`);
+      }
+    }
 
     if (!passed) {
       core.error(`❌ PR BLOCKED: ${failReason}`);
@@ -137,6 +166,12 @@ async function run(): Promise<void> {
   }
 }
 
+function failOnLevel(level: string, critical: number, major: number, total: number): boolean {
+  if (level === 'none') return false;
+  if (level === 'critical') return critical > 0;
+  if (level === 'major') return (critical + major) > 0;
+  if (level === 'any') return total > 0;
+  return false;
+}
+
 run();
-</task_progress>
-</write_to_file>
